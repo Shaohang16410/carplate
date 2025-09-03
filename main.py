@@ -3,6 +3,7 @@ import streamlit as st
 import cv2
 import numpy as np
 import os
+import time  # <--- CHANGE 1: IMPORT THE TIME MODULE
 from ultralytics import YOLO
 
 # Import the necessary functions from util.py
@@ -115,12 +116,19 @@ def main():
                 st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_column_width=True)
 
             if st.button("Process Image"):
+                # <--- CHANGE 2: ADD TIMER LOGIC ---
+                start_time = time.time()
                 with st.spinner("Processing image..."):
                     processed_image, results = process_frame(image, coco_model, license_plate_detector)
+                end_time = time.time()
+                processing_time = end_time - start_time
+                # --- END OF CHANGE ---
 
                 with col2:
                     st.subheader("Processed Image")
                     st.image(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB), use_column_width=True)
+                    # <--- CHANGE 3: DISPLAY THE PROCESSING TIME ---
+                    st.success(f"**Processing Time:** {processing_time:.2f} seconds")
 
                 st.subheader("Detection Results")
                 if results:

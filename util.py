@@ -1,9 +1,15 @@
+
+
 import string
 import easyocr
 import cv2
 import numpy as np
-import streamlit as st
+import streamlit as st  # <-- ADD THIS IMPORT
 
+# --- REMOVE THE OLD LINE ---
+# reader = easyocr.Reader(['en'], gpu=False)  <-- DELETE THIS
+
+# --- ADD THIS NEW CACHED FUNCTION ---
 @st.cache_resource
 def load_ocr_reader():
     """Loads the EasyOCR reader into cache."""
@@ -84,7 +90,11 @@ def read_license_plate(license_plate_crop):
     Read the license plate text from the given cropped image.
     Applies preprocessing before sending the image to the OCR reader.
     """
+    # --- UPDATE THIS PART ---
+    # Get the cached reader instead of using a global variable
     reader = load_ocr_reader()
+    # --- END OF UPDATE ---
+
     processed_plate = preprocess_for_ocr(license_plate_crop)
     detections = reader.readtext(processed_plate)
 
@@ -100,89 +110,6 @@ def read_license_plate(license_plate_crop):
     avg_score = total_score / len(detections)
     cleaned_text = clean_plate_text(full_text)
 
-    if len(cleaned_text) >= 3:
-        return cleaned_text, avg_score
-    else:
-        return None, None
-
-# --- NEW, ADVANCED OCR FUNCTIONS ---
-
-def preprocess_for_ocr_advanced(image, target_height=200):
-    """
-    Applies a more robust series of preprocessing steps to an image to improve OCR accuracy.
-    """
-    # 1. Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # 2. Upscale the image for better detail
-    scale_factor = target_height / gray.shape[0]
-    width = int(gray.shape[1] * scale_factor)
-    height = int(gray.shape[0] * scale_factor)
-    resized = cv2.resize(gray, (width, height), interpolation=cv2.INTER_CUBIC)
-
-    # 3. Apply Median Blur to reduce noise while preserving edges
-    blurred = cv2.medianBlur(resized, 3)
-
-    # 4. Sharpen the image to make characters more distinct
-    sharpen_kernel = np.array([[-1, -1, -1],
-                               [-1,  9, -1],
-                               [-1, -1, -1]])
-    sharpened = cv2.filter2D(blurred, -1, sharpen_kernel)
-
-    # 5. Apply adaptive thresholding for binarization
-    # This can be more robust than Otsu's in varying lighting
-    binary_image = cv2.adaptiveThreshold(
-        sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 11, 2
-    )
-
-    # 6. Morphological operation to remove small noise
-    # An 'opening' operation (erosion followed by dilation) removes small white specks
-    kernel = np.ones((2, 2), np.uint8)
-    opened_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, kernel)
-
-    return opened_image
-
-
-def read_license_plate_advanced(license_plate_crop, min_confidence=0.4):
-    """
-    Reads the license plate text using a more advanced pipeline.
-    - Uses the advanced preprocessing function.
-    - Provides an 'allowlist' to the OCR to constrain results.
-    - Filters results based on a minimum confidence score.
-    """
-    reader = load_ocr_reader()
-
-    # Apply the new advanced preprocessing
-    processed_plate = preprocess_for_ocr_advanced(license_plate_crop)
-
-    # Define the character set expected on a license plate
-    allowlist = string.ascii_uppercase + string.digits
-
-    # Perform OCR with the allowlist constraint
-    detections = reader.readtext(processed_plate, allowlist=allowlist)
-
-    if not detections:
-        return None, None
-
-    full_text = ""
-    total_score = 0
-    detection_count = 0
-
-    # Filter detections by confidence and aggregate results
-    for _, text, score in detections:
-        if score >= min_confidence:
-            full_text += text
-            total_score += score
-            detection_count += 1
-
-    if detection_count == 0:
-        return None, None
-
-    avg_score = total_score / detection_count
-    cleaned_text = clean_plate_text(full_text)
-
-    # Final check on cleaned text length
     if len(cleaned_text) >= 3:
         return cleaned_text, avg_score
     else:

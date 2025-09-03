@@ -1,4 +1,4 @@
-ultralytics==8.0.114
+ultralytics
 pandas
 opencv-python
 numpy
@@ -7,5 +7,3 @@ easyocr
 filterpy
 streamlit
 Pillow
-torch>=2.5.0
-torchvision>=0.16.0

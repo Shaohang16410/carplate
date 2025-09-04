@@ -2,12 +2,8 @@ import string
 import easyocr
 import cv2
 import numpy as np
-import streamlit as st  # <-- ADD THIS IMPORT
+import streamlit as st
 
-# --- REMOVE THE OLD LINE ---
-# reader = easyocr.Reader(['en'], gpu=False)  <-- DELETE THIS
-
-# --- ADD THIS NEW CACHED FUNCTION ---
 @st.cache_resource
 def load_ocr_reader():
     """Loads the EasyOCR reader into cache."""
@@ -17,7 +13,7 @@ def load_ocr_reader():
     return reader
 
 
-# --- NEW: CONSTANTS FOR OCR IMPROVEMENT ---
+# --- CONSTANTS FOR OCR IMPROVEMENT ---
 # Define a character set for license plates to improve OCR accuracy
 LICENSE_PLATE_CHARS = string.ascii_uppercase + string.digits
 
@@ -30,7 +26,6 @@ CHAR_CORRECTION_MAP = {
     'S': '5',
     'B': '8',
 }
-# --- END OF NEW CONSTANTS ---
 
 
 def write_csv(results, output_path):
@@ -77,7 +72,6 @@ def write_csv(results, output_path):
         f.close()
 
 
-# --- REVISED FUNCTION ---
 def preprocess_for_ocr(image):
     """
     Applies an improved series of preprocessing steps to an image for better OCR accuracy.
@@ -105,7 +99,6 @@ def preprocess_for_ocr(image):
     return binary_image
 
 
-# --- REVISED FUNCTION ---
 def clean_plate_text(text):
     """
     Cleans the license plate text by removing non-alphanumeric characters,
@@ -122,7 +115,6 @@ def clean_plate_text(text):
     return corrected_text
 
 
-# --- REVISED FUNCTION ---
 def read_license_plate(license_plate_crop):
     """
     Read the license plate text from the given cropped image.

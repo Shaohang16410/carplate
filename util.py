@@ -1,5 +1,3 @@
-
-
 import string
 import easyocr
 import cv2
@@ -17,6 +15,23 @@ def load_ocr_reader():
     reader = easyocr.Reader(['en'], gpu=False)
     st.success("✅ OCR reader ready!")
     return reader
+
+
+# --- NEW: CONSTANTS FOR OCR IMPROVEMENT ---
+# Define a character set for license plates to improve OCR accuracy
+LICENSE_PLATE_CHARS = string.ascii_uppercase + string.digits
+
+# Dictionary for common OCR character corrections
+# Note: This is heuristic and may not be suitable for all regions.
+CHAR_CORRECTION_MAP = {
+    'O': '0',
+    'I': '1',
+    'Z': '2',
+    'S': '5',
+    'B': '8',
+}
+# --- END OF NEW CONSTANTS ---
+
 
 def write_csv(results, output_path):
     """
@@ -62,54 +77,88 @@ def write_csv(results, output_path):
         f.close()
 
 
+# --- REVISED FUNCTION ---
 def preprocess_for_ocr(image):
     """
-    Applies a series of preprocessing steps to an image to improve OCR accuracy.
+    Applies an improved series of preprocessing steps to an image for better OCR accuracy.
     """
+    # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    scale_factor = 100 / blurred.shape[0]
-    width = int(blurred.shape[1] * scale_factor)
-    height = int(blurred.shape[0] * scale_factor)
-    resized = cv2.resize(blurred, (width, height), interpolation=cv2.INTER_CUBIC)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced_contrast = clahe.apply(resized)
-    _, binary_image = cv2.threshold(enhanced_contrast, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Upscale the image - OCR often performs better on larger, clearer images
+    # We use LANCZOS4 for high-quality interpolation
+    scale_factor = 2.5
+    width = int(gray.shape[1] * scale_factor)
+    height = int(gray.shape[0] * scale_factor)
+    resized = cv2.resize(gray, (width, height), interpolation=cv2.INTER_LANCZOS4)
+
+    # Apply bilateral filter for edge-preserving smoothing.
+    # This reduces noise while keeping the character edges sharp.
+    denoised = cv2.bilateralFilter(resized, 9, 75, 75)
+
+    # Apply adaptive thresholding. This is more robust to varying lighting conditions
+    # than a global threshold like Otsu's.
+    binary_image = cv2.adaptiveThreshold(
+        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, 11, 2
+    )
     return binary_image
 
 
+# --- REVISED FUNCTION ---
 def clean_plate_text(text):
     """
-    Cleans the license plate text by removing non-alphanumeric characters and converting to uppercase.
+    Cleans the license plate text by removing non-alphanumeric characters,
+    applying common corrections, and converting to uppercase.
     """
-    return "".join(char for char in text if char.isalnum()).upper()
+    # First, remove any characters not in our allowed set and convert to uppercase
+    base_cleaned_text = "".join(char for char in text if char in LICENSE_PLATE_CHARS).upper()
+
+    # Apply specific, common character corrections
+    corrected_text = ""
+    for char in base_cleaned_text:
+        corrected_text += CHAR_CORRECTION_MAP.get(char, char)
+
+    return corrected_text
 
 
+# --- REVISED FUNCTION ---
 def read_license_plate(license_plate_crop):
     """
     Read the license plate text from the given cropped image.
-    Applies preprocessing before sending the image to the OCR reader.
+    Applies improved preprocessing and uses an allowlist to constrain the OCR model.
     """
-    # --- UPDATE THIS PART ---
-    # Get the cached reader instead of using a global variable
     reader = load_ocr_reader()
-    # --- END OF UPDATE ---
-
     processed_plate = preprocess_for_ocr(license_plate_crop)
-    detections = reader.readtext(processed_plate)
+
+    # Use the allowlist and other parameters to get more accurate results
+    detections = reader.readtext(
+        processed_plate,
+        allowlist=LICENSE_PLATE_CHARS,
+        paragraph=False,  # Important: treat each detection as a single line
+        decoder='beamsearch',  # Can be more accurate than the default 'greedy'
+        batch_size=4
+    )
 
     if not detections:
         return None, None
 
+    # Combine text from all detections and calculate an average confidence score
     full_text = ""
     total_score = 0
-    for bbox, text, score in detections:
+    num_detections = 0
+    for _, text, score in detections:
         full_text += text
         total_score += score
+        num_detections += 1
 
-    avg_score = total_score / len(detections)
+    if num_detections == 0:
+        return None, None
+
+    avg_score = total_score / num_detections
     cleaned_text = clean_plate_text(full_text)
 
+    # Return the result only if it's a plausible length
     if len(cleaned_text) >= 3:
         return cleaned_text, avg_score
     else:

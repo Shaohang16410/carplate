@@ -8,7 +8,11 @@ import streamlit as st
 def load_ocr_reader():
     """Loads the EasyOCR reader into cache."""
     st.info("Initializing OCR reader... This may take a moment on the first run.")
-    reader = easyocr.Reader(['en'], gpu=False)
+    # --- UPGRADE APPLIED HERE ---
+    # We specify a more modern recognition network, 'latin_g2', which is often more
+    # accurate for recognizing characters found on license plates than the default model.
+    reader = easyocr.Reader(['en'], gpu=False, recog_network='latin_g2')
+    # --- END OF UPGRADE ---
     st.success("✅ OCR reader ready!")
     return reader
 

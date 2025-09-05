@@ -3,7 +3,7 @@ import streamlit as st
 import cv2
 import numpy as np
 import os
-import time  # <--- CHANGE 1: IMPORT THE TIME MODULE
+import time
 from ultralytics import YOLO
 
 # Import the necessary functions from util.py
@@ -34,10 +34,7 @@ def load_models(coco_model_file, license_plate_model_file):
 
 # --- FRAME/IMAGE PROCESSING ---
 def process_frame(image, coco_model, license_plate_detector):
-    """
-    Detects cars and license plates in a single image, performs OCR, and overlays results.
-    Returns the annotated image and a list of structured detection results.
-    """
+
     results_list = []
     annotated_image = image.copy()
 
@@ -53,8 +50,6 @@ def process_frame(image, coco_model, license_plate_detector):
         if car[0] == -1:
             continue
 
-        # --- FIX APPLIED HERE ---
-        # Unpack the 5 values returned by get_car correctly
         xcar1, ycar1, xcar2, ycar2, car_score = car
         # --- END OF FIX ---
 
@@ -69,7 +64,7 @@ def process_frame(image, coco_model, license_plate_detector):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
             results_list.append({
                 "text": text,
-                "car_score": car_score,  # Use the correctly unpacked car_score
+                "car_score": car_score,
                 "plate_bbox_score": plate_score,
                 "ocr_score": ocr_score
             })
@@ -88,11 +83,7 @@ def main():
     uploaded_coco_model = st.sidebar.file_uploader("Upload Vehicle Detection Model (.pt)", type=['pt'])
     uploaded_lp_model = st.sidebar.file_uploader("Upload License Plate Model (.pt)", type=['pt'])
 
-    # --- THE ROBUST FIX ---
-    # Check if BOTH models have been uploaded. Only proceed if they exist.
     if uploaded_coco_model is not None and uploaded_lp_model is not None:
-
-        # This code block is now SAFE because it only runs when the files are present.
         coco_model_path = "temp_coco.pt"
         license_plate_model_path = "temp_lp.pt"
         with open(coco_model_path, "wb") as f:
@@ -102,7 +93,6 @@ def main():
 
         coco_model, license_plate_detector = load_models(coco_model_path, license_plate_model_path)
 
-        # --- UI FOR IMAGE PROCESSING ---
         st.header("Upload an Image")
         uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
@@ -116,18 +106,16 @@ def main():
                 st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_column_width=True)
 
             if st.button("Process Image"):
-                # <--- CHANGE 2: ADD TIMER LOGIC ---
                 start_time = time.time()
                 with st.spinner("Processing image..."):
                     processed_image, results = process_frame(image, coco_model, license_plate_detector)
                 end_time = time.time()
                 processing_time = end_time - start_time
-                # --- END OF CHANGE ---
+
 
                 with col2:
                     st.subheader("Processed Image")
                     st.image(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB), use_column_width=True)
-                    # <--- CHANGE 3: DISPLAY THE PROCESSING TIME ---
                     st.success(f"**Processing Time:** {processing_time:.2f} seconds")
 
                 st.subheader("Detection Results")
@@ -140,8 +128,6 @@ def main():
                 else:
                     st.warning("No license plates detected in the image.")
     else:
-        # If one or both models are missing, simply show the warning.
-        # The script will end here gracefully without crashing.
         st.warning("Please upload both model files using the sidebar to continue.")
 
 

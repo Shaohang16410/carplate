@@ -83,15 +83,6 @@ def main():
     uploaded_coco_model = st.sidebar.file_uploader("Upload Vehicle Detection Model (.pt)", type=['pt'])
     uploaded_lp_model = st.sidebar.file_uploader("Upload License Plate Model (.pt)", type=['pt'])
 
-    # --- START: New Section for Model Performance Uploads ---
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("Upload Model Performance Images (Optional)"):
-        uploaded_results_img = st.file_uploader("Upload Training Results Chart (e.g., results.png)", type=["png", "jpg", "jpeg"])
-        uploaded_cm_img = st.file_uploader("Upload Confusion Matrix (e.g., confusion_matrix.png)", type=["png", "jpg", "jpeg"])
-        uploaded_labels_img = st.file_uploader("Upload Labels Distribution (e.g., labels.jpg)", type=["png", "jpg", "jpeg"])
-    # --- END: New Section for Model Performance Uploads ---
-
-
     if uploaded_coco_model is not None and uploaded_lp_model is not None:
         coco_model_path = "temp_coco.pt"
         license_plate_model_path = "temp_lp.pt"
@@ -102,7 +93,7 @@ def main():
 
         coco_model, license_plate_detector = load_models(coco_model_path, license_plate_model_path)
 
-        st.header("Upload an Image for Detection")
+        st.header("Upload an Image")
         uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
         if uploaded_file is not None:
@@ -136,33 +127,6 @@ def main():
                         st.write(f"  - OCR Confidence: {res['ocr_score'] * 100:.2f}%")
                 else:
                     st.warning("No license plates detected in the image.")
-
-        # --- START: New Section for Displaying Model Performance ---
-        st.markdown("---")
-        st.header("License Plate Model Performance Analysis")
-
-        if uploaded_results_img or uploaded_cm_img or uploaded_labels_img:
-            st.info("Displaying uploaded model performance charts.")
-
-            if uploaded_results_img:
-                st.subheader("Training & Validation Curves")
-                st.image(uploaded_results_img, caption="Loss and metrics curves over training epochs.", use_column_width=True)
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if uploaded_cm_img:
-                    st.subheader("Confusion Matrix")
-                    st.image(uploaded_cm_img, caption="Model's confusion matrix on the validation set.", use_column_width=True)
-
-            with col2:
-                if uploaded_labels_img:
-                    st.subheader("Training Data Labels")
-                    st.image(uploaded_labels_img, caption="Distribution of labels in the training dataset.", use_column_width=True)
-        else:
-            st.warning("No model performance images were uploaded. To see them, upload the relevant files in the sidebar.")
-        # --- END: New Section for Displaying Model Performance ---
-
-
     else:
         st.warning("Please upload both model files using the sidebar to continue.")
 

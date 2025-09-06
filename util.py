@@ -36,21 +36,17 @@ def write_csv(results, output_path):
 
 
 def get_skew_angle(image) -> float:
-    """Finds the skew angle of the text in the image."""
     contours, _ = cv2.findContours(image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return 0.0
+    if not contours: return 0.0
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     largest_contour = contours[0]
     rect = cv2.minAreaRect(largest_contour)
     angle = rect[-1]
-    if angle < -45:
-        angle = 90 + angle
+    if angle < -45: angle = 90 + angle
     return angle
 
 
 def rotate_image(image, angle: float):
-    """Rotates an image to correct for skew."""
     (h, w) = image.shape[:2]
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
@@ -59,12 +55,11 @@ def rotate_image(image, angle: float):
 
 
 def preprocess_for_ocr(image):
-    """Improved preprocessing pipeline for OCR."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     scale_factor = max(1.5, 300 / gray.shape[1] if gray.shape[1] > 0 else 1.5)
     width = int(gray.shape[1] * scale_factor)
     height = int(gray.shape[0] * scale_factor)
-    if width == 0 or height == 0: return gray  # return original gray if resize is not possible
+    if width == 0 or height == 0: return gray
     resized = cv2.resize(gray, (width, height), interpolation=cv2.INTER_LANCZOS4)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced_contrast = clahe.apply(resized)
@@ -81,20 +76,31 @@ def preprocess_for_ocr(image):
 
 
 def clean_plate_text(text):
-    """Cleans the OCR'd text."""
-    base_cleaned_text = "".join(char for char in text if char in LICENSE_PLATE_CHARS).upper()
+    base_cleaned_text = "".join(char for char in text if char in LICENSE_PLATE_CHARS or char == ' ').upper()
     corrected_text = "".join(CHAR_CORRECTION_MAP.get(char, char) for char in base_cleaned_text)
     return corrected_text
 
 
 def is_valid_license_plate(text):
-    """Checks if the text conforms to a common license plate format."""
-    if not (4 <= len(text) <= 8):
+    """
+    Checks if the text conforms to common license plate formats,
+    including UK, Malaysian, and other general patterns.
+    """
+    text = text.replace(' ', '').upper()
+    if not (5 <= len(text) <= 12):
         return False
-    if re.match(r'^[A-Z]{3}[0-9]{4}$', text): return True
-    if re.match(r'^[A-Z]{4}[0-9]{3}$', text): return True
-    if re.match(r'^[A-Z0-9]{4,8}$', text) and (
-            any(c.isalpha() for c in text) and any(c.isdigit() for c in text)): return True
+    # UK Format (e.g., SN66XMZ)
+    if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z]{3}$', text):
+        return True
+    # Malaysian/Singaporean/Vanity (e.g., PATRIOT4915)
+    if re.match(r'^[A-Z]{1,10}[0-9]{1,4}$', text):
+        return True
+    # Common US/EU style (e.g., ABC1234)
+    if re.match(r'^[A-Z]{3,4}[0-9]{3,4}$', text):
+        return True
+    # General Fallback
+    if re.match(r'^[A-Z0-9]{5,10}$', text) and any(c.isalpha() for c in text) and any(c.isdigit() for c in text):
+        return True
     return False
 
 
@@ -114,18 +120,18 @@ def read_license_plate(license_plate_crop):
     cleaned_text = clean_plate_text(full_text)
 
     if is_valid_license_plate(cleaned_text):
-        return cleaned_text, avg_score
+        return cleaned_text.replace(' ', ''), avg_score
     else:
         for i in range(len(cleaned_text)):
-            for j in range(i + 4, len(cleaned_text) + 1):
+            for j in range(i + 5, len(cleaned_text) + 1):
                 substring = cleaned_text[i:j]
                 if is_valid_license_plate(substring):
-                    return substring, avg_score
+                    return substring.replace(' ', ''), avg_score
     return None, None
 
 
-# The get_car function is no longer used by main.py but can be kept
 def get_car(license_plate, vehicle_detections):
+    # This function is not currently used by main.py but kept for completeness
     x1, y1, x2, y2, _, _ = license_plate
     for detection in vehicle_detections:
         if len(detection) >= 6:
